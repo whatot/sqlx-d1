@@ -120,7 +120,7 @@ impl QueryMacroInput {
         if self.arg_exprs.is_empty() {
             return Ok(quote! {
                 let query_args = ::core::result::Result::<_, ::sqlx_d1::sqlx_core::error::BoxDynError>::Ok(
-                    <::sqlx_d1::D1 as ::sqlx_d1::sqlx_core::database::Database>::Arguments::<'_>::default()
+                    <::sqlx_d1::D1 as ::sqlx_d1::sqlx_core::database::Database>::Arguments::default()
                 );
             });
         }
@@ -148,10 +148,10 @@ impl QueryMacroInput {
                         return Ok(TokenStream::new());
                     }
 
-                    let param_type_name = <sqlx_d1_core::D1 as sqlx_core::type_checking::TypeChecking>::param_type_for_id(param_type_info)
-                        .ok_or_else(|| syn::Error::new(
+                    let param_type_name = <sqlx_d1_core::D1 as sqlx_core::type_checking::TypeChecking>::param_type_for_id(param_type_info, &Default::default())
+                        .map_err(|error| syn::Error::new(
                             param_expr.span(),
-                            format!("unsupported type {param_type_info} for param #{}", i + 1)
+                            format!("unsupported type {param_type_info} for param #{}: {error}", i + 1)
                         ))?
                         .parse::<TokenStream>()
                         .map_err(|_| syn::Error::new(
@@ -182,7 +182,7 @@ impl QueryMacroInput {
 
             #args_check
 
-            let mut query_args = <::sqlx_d1::D1 as ::sqlx_d1::sqlx_core::database::Database>::Arguments::<'_>::default();
+            let mut query_args = <::sqlx_d1::D1 as ::sqlx_d1::sqlx_core::database::Database>::Arguments::default();
             query_args.reserve(#args_count, 0 #(+ ::sqlx_d1::sqlx_core::encode::Encode::<::sqlx_d1::D1>::size_hint(#arg_idents))*);
 
             let query_args = ::core::result::Result::<_, ::sqlx_d1::sqlx_core::error::BoxDynError>::Ok(query_args)

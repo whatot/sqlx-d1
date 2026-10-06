@@ -4,6 +4,7 @@ documentation = "https://docs.rs/sqlx-d1-macros"
 description = "proc macros for sqlx-d1 - SQLx for Cloudflare D1"
 version = { workspace = true }
 edition = { workspace = true }
+rust-version = { workspace = true }
 authors = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -24,9 +25,9 @@ derive = ["dep:heck"]
 query = ["dep:sha2", "dep:hex", "dep:futures-lite", "sqlx-d1-core/offline"]
 
 [dependencies]
-sqlx-d1-core = { path = "../sqlx-d1-core", version = "=0.4.3" }
-sqlx-core = { version = "=0.8.6" }
-sqlx-macros-core = { version = "=0.8.6", features = ["macros"] }
+sqlx-d1-core = { path = "../sqlx-d1-core", version = "=0.5.0" }
+sqlx-core = { workspace = true }
+sqlx-macros-core = { workspace = true }
 syn = { version = "2.0", features = ["full"] }
 proc-macro2 = { version = "1.0" }
 quote = { version = "1.0" }

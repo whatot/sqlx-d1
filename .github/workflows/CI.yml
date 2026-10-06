@@ -16,6 +16,9 @@ jobs:
         toolchain: ['stable', 'nightly']
         target: ['', 'wasm32-unknown-unknown']
 
+    env:
+      RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
+
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -36,6 +39,9 @@ jobs:
       - name: Test documentations
         working-directory: ./sqlx-d1
         run: cargo test --doc --features macros
+
+      - name: Test SQLx compatibility
+        run: cargo test --workspace --all-features --lib --tests
 
       - name: Check fmt
         run: |

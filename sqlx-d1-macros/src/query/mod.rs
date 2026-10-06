@@ -191,7 +191,9 @@ pub(super) fn expand_input(input: TokenStream) -> Result<TokenStream, syn::Error
                             GitHub Issues (https://github.com/ohkami-rs/sqlx-d1/issues) !"
                         )
                     ))?;
-                let describe = (&mut conn).describe(&input.sql)
+                let describe = (&mut conn).describe(sqlx_core::sql_str::SqlSafeStr::into_sql_str(
+                    sqlx_core::sql_str::AssertSqlSafe(input.sql.clone()),
+                ))
                     .await
                     .map_err(|e| syn::Error::new(input.src_span, e))?;
                 Ok::<_, syn::Error>(describe)

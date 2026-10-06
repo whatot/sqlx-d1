@@ -226,21 +226,24 @@ pub fn quote_query_scalar(
 fn get_column_type(i: usize, column: &<D1 as Database>::Column) -> TokenStream {
     let type_info = column.type_info();
 
-    <D1 as sqlx_core::type_checking::TypeChecking>::return_type_for_id(type_info)
-        .map(|t| t.parse().unwrap())
-        .unwrap_or_else(|| {
-            syn::Error::new(
-                Span::call_site(),
-                format!(
-                    "unsupported type {type_info} of {}",
-                    DisplayColumn {
-                        idx: i,
-                        name: column.name()
-                    }
-                ),
-            )
-            .to_compile_error()
-        })
+    <D1 as sqlx_core::type_checking::TypeChecking>::return_type_for_id(
+        type_info,
+        &Default::default(),
+    )
+    .map(|t| t.parse().unwrap())
+    .unwrap_or_else(|error| {
+        syn::Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported type {type_info} of {}: {error}",
+                DisplayColumn {
+                    idx: i,
+                    name: column.name()
+                }
+            ),
+        )
+        .to_compile_error()
+    })
 }
 
 impl ColumnDecl {

@@ -54,30 +54,37 @@ const _: () = {
 };
 
 /* ref: <https://github.com/launchbadge/sqlx/blob/277dd36c7868acb10eae20f50418e273b71c8499/sqlx-sqlite/src/type_checking.rs> */
-sqlx_core::impl_type_checking! {
-    crate::D1 {
-        // BOOLEAN,
-        bool,
-        // INTEGER,
-        i64,
-        // REAL,
-        f64,
-        // TEXT,
-        String,
-        // BLOB,
-        Vec<u8>,
-        // DATE,
-        #[cfg(feature = "chrono")]
-        sqlx_core::types::chrono::NaiveDate,
-        // TIME,
-        #[cfg(feature = "chrono")]
-        sqlx_core::types::chrono::NaiveTime,
-        // DATETIME,
-        #[cfg(feature = "chrono")]
-        sqlx_core::types::chrono::NaiveDateTime,
-    },
-    ParamChecking::Weak,
-    feature-types: _info => None,
+// SQLx checks these optional integrations even when their type lists are empty.
+#[allow(unexpected_cfgs)]
+mod type_checking {
+    sqlx_core::impl_type_checking! {
+        crate::D1 {
+            // BOOLEAN,
+            bool,
+            // INTEGER,
+            i64,
+            // REAL,
+            f64,
+            // TEXT,
+            String,
+            // BLOB,
+            Vec<u8>,
+        },
+        ParamChecking::Weak,
+        feature-types: _info => None,
+        datetime-types: {
+            chrono: {
+                sqlx_core::types::chrono::NaiveDate,
+                sqlx_core::types::chrono::NaiveTime,
+                sqlx_core::types::chrono::NaiveDateTime,
+            },
+            time: {},
+        },
+        numeric-types: {
+            bigdecimal: {},
+            rust_decimal: {},
+        },
+    }
 }
 
 /* `Type`, `Encode`, `Decode` implementations for specific types */
@@ -85,7 +92,7 @@ sqlx_core::impl_type_checking! {
 impl<'q, E: Encode<'q, D1>> Encode<'q, D1> for Option<E> {
     fn encode_by_ref(
         &self,
-        buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'q>,
+        buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
         match self {
             Some(e) => <E as Encode<'q, D1>>::encode_by_ref(e, buf),
@@ -101,7 +108,7 @@ macro_rules! serialize {
     ($q:lifetime) => {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<$q>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             buf.push(D1Value::from(
                 serde_wasm_bindgen::to_value(self).map_err(D1Error::from_rust)?,
@@ -151,7 +158,11 @@ impl<'q> Encode<'q, D1> for &'q [u8] {
 }
 
 serde_wasm_bindgen!(Vec<u8> where Vec<u8>);
-serde_wasm_bindgen!(Box<[u8]> where Vec<u8>);
+// SQLx provides Type/Decode for these pointers, but its Encode impl requires Sized.
+impl Compatible<Vec<u8>> for Box<[u8]> {}
+impl<'q> Encode<'q, D1> for Box<[u8]> {
+    serialize!('q);
+}
 
 serde_wasm_bindgen!(f32 where f64);
 serde_wasm_bindgen!(f64 where f64);
@@ -170,16 +181,25 @@ serde_wasm_bindgen!(usize where i64);
 
 impl Type<D1> for str {
     fn type_info() -> <D1 as sqlx_core::database::Database>::TypeInfo {
-        D1TypeInfo::blob()
+        D1TypeInfo::text()
     }
 }
 impl<'q> Encode<'q, D1> for &'q str {
     serialize!('q);
 }
 
-serde_wasm_bindgen!(Box<str> where String);
+impl Compatible<String> for Box<str> {}
+impl<'q> Encode<'q, D1> for Box<str> {
+    serialize!('q);
+}
+impl Decode<'_, D1> for Box<str> {
+    deserialize!();
+}
 serde_wasm_bindgen!(String where String);
-serde_wasm_bindgen!(std::borrow::Cow<'_, str> where String);
+impl Compatible<String> for std::borrow::Cow<'_, str> {}
+impl<'q> Encode<'q, D1> for std::borrow::Cow<'q, str> {
+    serialize!('q);
+}
 
 /// specialized conversion: true <-> 1 / false <-> 0
 const _: (/* bool */) = {
@@ -194,7 +214,7 @@ const _: (/* bool */) = {
     impl<'q> Encode<'q, D1> for bool {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'q>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             buf.push(D1Value::from(JsValue::from_f64(if *self {1.} else {0.})));
             Ok(IsNull::No)
@@ -229,7 +249,7 @@ const _: (/* generics text */) = {
     {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'q>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <String as Encode<'q, D1>>::encode(self.0.to_string(), buf)
         }
@@ -268,7 +288,7 @@ const _: (/* json */) = {
     {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'q>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <String as Encode<'q, D1>>::encode(self.encode_to_string()?, buf)
         }
@@ -301,7 +321,7 @@ const _: (/* uuid */) = {
     impl<'q> Encode<'q, D1> for Uuid {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'q>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <Vec<u8> as Encode<'q, D1>>::encode(self.into_bytes().into(), buf)
         }
@@ -324,7 +344,7 @@ const _: (/* uuid */) = {
     impl<'q> Encode<'q, D1> for Hyphenated {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'q>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <String as Encode<'q, D1>>::encode(self.to_string(), buf)
         }
@@ -348,7 +368,7 @@ const _: (/* uuid */) = {
     impl<'q> Encode<'q, D1> for Simple {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'q>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <String as Encode<'q, D1>>::encode(self.to_string(), buf)
         }
@@ -390,7 +410,7 @@ const _: (/* chrono */) = {
     impl<Tz: TimeZone> Encode<'_, D1> for DateTime<Tz> {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'_>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             let mut rfc3339 = self.to_rfc3339();
             if rfc3339.ends_with('Z') {let _ = rfc3339.pop().unwrap();}
@@ -504,7 +524,7 @@ const _: (/* chrono */) = {
     impl Encode<'_, D1> for NaiveDateTime {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'_>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <String as Encode<'_, D1>>::encode(self.format("%F %T%.f").to_string(), buf)
         }
@@ -529,7 +549,7 @@ const _: (/* chrono */) = {
     impl Encode<'_, D1> for NaiveDate {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'_>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <String as Encode<'_, D1>>::encode(self.format("%F").to_string(), buf)
         }
@@ -555,7 +575,7 @@ const _: (/* chrono */) = {
     impl Encode<'_, D1> for NaiveTime {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'_>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <String as Encode<'_, D1>>::encode(self.format("%T%.f").to_string(), buf)
         }
@@ -601,7 +621,7 @@ const _: (/* decimal */) = {
     impl<'q> Encode<'q, D1> for Decimal {
         fn encode_by_ref(
             &self,
-            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer<'q>,
+            buf: &mut <D1 as sqlx_core::database::Database>::ArgumentBuffer,
         ) -> Result<IsNull, sqlx_core::error::BoxDynError> {
             <String as Encode<'q, D1>>::encode(self.to_string(), buf)
         }

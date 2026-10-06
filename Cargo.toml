@@ -4,8 +4,9 @@ members = ["sqlx-d1", "sqlx-d1-core", "sqlx-d1-macros"]
 exclude = ["sandbox"]
 
 [workspace.package]
-version = "0.4.3"
+version = "0.5.0"
 edition = "2024"
+rust-version = "1.94"
 authors = ["kanarus <mail@kanarus.dev>"]
 homepage = "https://crates.io/crates/sqlx-d1"
 repository = "https://github.com/ohkami-rs/sqlx-d1"
@@ -19,3 +20,8 @@ categories = [
   "network-programming",
 ]
 license = "MIT"
+
+[workspace.dependencies]
+sqlx-core = "0.9.0"
+sqlx-sqlite = { version = "0.9.0", features = ["bundled", "offline"] }
+sqlx-macros-core = { version = "0.9.0", features = ["macros"] }

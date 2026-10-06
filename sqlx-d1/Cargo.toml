@@ -4,6 +4,7 @@ documentation = "https://docs.rs/sqlx-d1"
 description = "SQLx for Cloudflare D1"
 version = { workspace = true }
 edition = { workspace = true }
+rust-version = { workspace = true }
 authors = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -16,8 +17,8 @@ license = { workspace = true }
 features = ["json", "uuid", "chrono", "decimal", "macros"]
 
 [dependencies]
-sqlx-d1-core = { path = "../sqlx-d1-core", version = "=0.4.3" }
-sqlx-d1-macros = { path = "../sqlx-d1-macros", version = "=0.4.3", optional = true }
+sqlx-d1-core = { path = "../sqlx-d1-core", version = "=0.5.0" }
+sqlx-d1-macros = { path = "../sqlx-d1-macros", version = "=0.5.0", optional = true }
 
 [features]
 json = ["sqlx-d1-core/json"]

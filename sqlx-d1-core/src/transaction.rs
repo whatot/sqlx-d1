@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use sqlx_core::sql_str::SqlStr;
 
 use crate::D1Connection;
 
@@ -10,41 +10,41 @@ impl sqlx_core::transaction::TransactionManager for D1TransactionManager {
     fn begin<'conn>(
         #[allow(unused)]
         conn: &'conn mut <Self::Database as sqlx_core::database::Database>::Connection,
-        #[allow(unused)] statement: Option<Cow<'static, str>>,
-    ) -> crate::ResultFuture<'conn, ()> {
+        #[allow(unused)] statement: Option<SqlStr>,
+    ) -> impl Future<Output = Result<(), sqlx_core::Error>> + Send + 'conn {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            unreachable!("Native `TransactionManager` impl")
+            async { unreachable!("Native `TransactionManager` impl") }
         }
         #[cfg(target_arch = "wasm32")]
         {
-            Box::pin(async { Ok(()) })
+            async { Ok(()) }
         }
     }
 
     fn commit(
         #[allow(unused)] conn: &mut <Self::Database as sqlx_core::database::Database>::Connection,
-    ) -> crate::ResultFuture<'_, ()> {
+    ) -> impl Future<Output = Result<(), sqlx_core::Error>> + Send + '_ {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            unreachable!("Native `TransactionManager` impl")
+            async { unreachable!("Native `TransactionManager` impl") }
         }
         #[cfg(target_arch = "wasm32")]
         {
-            Box::pin(async { Ok(()) })
+            async { Ok(()) }
         }
     }
 
     fn rollback(
         #[allow(unused)] conn: &mut <Self::Database as sqlx_core::database::Database>::Connection,
-    ) -> crate::ResultFuture<'_, ()> {
+    ) -> impl Future<Output = Result<(), sqlx_core::Error>> + Send + '_ {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            unreachable!("Native `TransactionManager` impl")
+            async { unreachable!("Native `TransactionManager` impl") }
         }
         #[cfg(target_arch = "wasm32")]
         {
-            Box::pin(async { Ok(()) })
+            async { Ok(()) }
         }
     }
 

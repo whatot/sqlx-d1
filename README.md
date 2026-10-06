@@ -20,6 +20,19 @@ SQLx-D1 realizes "SQLx for Cloudflare D1" _**with compile-time SQL verification*
 |   0.2.*   |   0.6.*  |
 |   0.3.*   |   0.7.*  |
 |   0.4.*   |   0.8.*  |
+|   0.5.*   |   0.8.*  |
+
+## SQLx 0.9 compatibility
+
+SQLx-D1 0.5 targets SQLx **0.9.x** and requires Rust **1.94+**.
+`worker` / `worker-sys` remain on **0.8.x**. SQLx dependency versions are declared
+once in the workspace and allow compatible 0.9 updates instead of pinning 0.8.6.
+
+The query helpers follow SQLx 0.9's `SqlSafeStr` API: SQL literals work directly;
+use `QueryBuilder` for generated queries, or explicitly audit a dynamic SQL string
+and wrap it in `sqlx_d1::AssertSqlSafe`. Continue binding all data values.
+`QueryBuilder`, `Database::Arguments`, `ArgumentBuffer`, and `Statement` no longer
+carry the old SQL lifetime parameter. Existing offline query caches remain supported.
 
 ## Background
 
@@ -59,7 +72,7 @@ SQLx-D1 works around them by loading `sqlx-sqlite` **only in macro context** and
 # Cargo.toml
 
 [dependencies]
-sqlx-d1 = { version = "0.4", features = ["macros"] }
+sqlx-d1 = { version = "0.5", features = ["macros"] }
 worker = { version = "0.8", features = ["d1"] }
 serde = { version = "1.0", features = ["derive"] }
 ```

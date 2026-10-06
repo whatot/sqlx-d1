@@ -1,4 +1,4 @@
-use sqlx_core::{Either, Url};
+use sqlx_core::{Either, Url, sql_str::SqlStr};
 
 #[cfg(target_arch = "wasm32")]
 use {
@@ -145,33 +145,33 @@ const _: () = {
 
         type Options = D1ConnectOptions;
 
-        fn close(self) -> crate::ResultFuture<'static, ()> {
-            Box::pin(async { Ok(()) })
+        async fn close(self) -> Result<(), sqlx_core::Error> {
+            Ok(())
         }
 
-        fn close_hard(self) -> crate::ResultFuture<'static, ()> {
-            Box::pin(async { Ok(()) })
+        async fn close_hard(self) -> Result<(), sqlx_core::Error> {
+            Ok(())
         }
 
-        fn ping(&mut self) -> crate::ResultFuture<'_, ()> {
-            Box::pin(async { Ok(()) })
+        async fn ping(&mut self) -> Result<(), sqlx_core::Error> {
+            Ok(())
         }
 
-        fn begin(
+        async fn begin(
             &mut self,
-        ) -> crate::ResultFuture<'_, sqlx_core::transaction::Transaction<'_, Self::Database>>
+        ) -> Result<sqlx_core::transaction::Transaction<'_, Self::Database>, sqlx_core::Error>
         where
             Self: Sized,
         {
-            sqlx_core::transaction::Transaction::begin(self, None)
+            sqlx_core::transaction::Transaction::begin(self, None).await
         }
 
         fn shrink_buffers(&mut self) {
             /* do nothing */
         }
 
-        fn flush(&mut self) -> crate::ResultFuture<'_, ()> {
-            Box::pin(async { Ok(()) })
+        async fn flush(&mut self) -> Result<(), sqlx_core::Error> {
+            Ok(())
         }
 
         fn should_flush(&self) -> bool {
@@ -213,24 +213,21 @@ const _: () = {
             <&'c D1Connection as sqlx_core::executor::Executor<'c>>::fetch_optional(self, query)
         }
 
-        fn prepare_with<'e, 'q: 'e>(
+        fn prepare_with<'e>(
             self,
-            sql: &'q str,
+            sql: SqlStr,
             _parameters: &'e [<Self::Database as sqlx_core::database::Database>::TypeInfo],
-        ) -> crate::ResultFuture<'e, <Self::Database as sqlx_core::database::Database>::Statement<'q>>
+        ) -> crate::ResultFuture<'e, <Self::Database as sqlx_core::database::Database>::Statement>
         where
             'c: 'e,
         {
-            Box::pin(async {
-                Ok(crate::statement::D1Statement {
-                    sql: std::borrow::Cow::Borrowed(sql),
-                })
-            })
+            Box::pin(async { Ok(crate::statement::D1Statement { sql }) })
         }
 
-        fn describe<'e, 'q: 'e>(
+        #[cfg(any(feature = "offline", not(target_arch = "wasm32")))]
+        fn describe<'e>(
             self,
-            #[allow(unused)] sql: &'q str,
+            #[allow(unused)] sql: SqlStr,
         ) -> crate::ResultFuture<'e, sqlx_core::describe::Describe<Self::Database>>
         where
             'c: 'e,
@@ -300,7 +297,6 @@ const _: () = {
             }
             #[cfg(target_arch = "wasm32")]
             {
-                let sql = query.sql();
                 let arguments = match query.take_arguments() {
                     Ok(a) => a,
                     Err(e) => {
@@ -309,6 +305,8 @@ const _: () = {
                         }));
                     }
                 };
+
+                let sql = query.sql();
 
                 struct FetchMany<F> {
                     raw_rows_future: F,
@@ -383,7 +381,7 @@ const _: () = {
                 };
 
                 Box::pin(FetchMany::new(async move {
-                    let mut statement = self.inner.prepare(sql).unwrap();
+                    let mut statement = self.inner.prepare(sql.as_str()).unwrap();
                     if let Some(a) = arguments {
                         statement = statement.bind(a.as_ref().iter().collect())?;
                     }
@@ -408,14 +406,15 @@ const _: () = {
             }
             #[cfg(target_arch = "wasm32")]
             {
-                let sql = query.sql();
                 let arguments = match query.take_arguments() {
                     Ok(a) => a,
                     Err(e) => return Box::pin(async { Err(sqlx_core::Error::Encode(e)) }),
                 };
 
+                let sql = query.sql();
+
                 Box::pin(worker::send::SendFuture::new(async move {
-                    let mut statement = self.inner.prepare(sql).unwrap();
+                    let mut statement = self.inner.prepare(sql.as_str()).unwrap();
                     if let Some(a) = arguments {
                         statement = statement
                             .bind(a.as_ref().iter().collect())
@@ -434,24 +433,21 @@ const _: () = {
             }
         }
 
-        fn prepare_with<'e, 'q: 'e>(
+        fn prepare_with<'e>(
             self,
-            sql: &'q str,
+            sql: SqlStr,
             _parameters: &'e [<Self::Database as sqlx_core::database::Database>::TypeInfo],
-        ) -> crate::ResultFuture<'e, <Self::Database as sqlx_core::database::Database>::Statement<'q>>
+        ) -> crate::ResultFuture<'e, <Self::Database as sqlx_core::database::Database>::Statement>
         where
             'c: 'e,
         {
-            Box::pin(async {
-                Ok(crate::statement::D1Statement {
-                    sql: std::borrow::Cow::Borrowed(sql),
-                })
-            })
+            Box::pin(async { Ok(crate::statement::D1Statement { sql }) })
         }
 
-        fn describe<'e, 'q: 'e>(
+        #[cfg(any(feature = "offline", not(target_arch = "wasm32")))]
+        fn describe<'e>(
             self,
-            #[allow(unused)] sql: &'q str,
+            #[allow(unused)] sql: SqlStr,
         ) -> crate::ResultFuture<'e, sqlx_core::describe::Describe<Self::Database>>
         where
             'c: 'e,
@@ -634,7 +630,9 @@ const _: () = {
             unreachable!("`sqlx_d1::ConnectOptions` doesn't support `ConnectOptions::to_url_lossy`")
         }
 
-        fn connect(&self) -> crate::ResultFuture<'_, Self::Connection>
+        fn connect(
+            &self,
+        ) -> impl Future<Output = Result<Self::Connection, sqlx_core::Error>> + Send + '_
         where
             Self::Connection: Sized,
         {
